@@ -1,9 +1,11 @@
 var app = {
+  server: 'http://parse.sfm6.hackreactor.com/chatterbox/classes/messages',
   user: {
     username: window.location.search.slice(10),
-    friend: []},
-  init: function() {
+    friend: []
+  },
   
+  init: function() {
     var submitButton = $('.submit');
     
     submitButton.on('click', function () {
@@ -12,16 +14,22 @@ var app = {
       console.log(text);
       app.handleSubmit(text);
     });
+    
+    setInterval(function() {
+      app.clearMessages();
+      app.fetch();
+    }, 30000);
   },
   
   send: function (message) {
     $.ajax({
-      url: 'http://parse.sfm6.hackreactor.com/chatterbox/classes/messages',
+      url: app.server,
       type: 'POST',
       data: JSON.stringify(message),
       contentType: 'application/json',
-      success: function(data) {
-        console.log('chatterbox: Message sent');
+      success: function(data) {     
+        app.renderMessage(data);       
+        console.log('chatterbox: Message sent: ', data);
       },
       error: function (data) {
         console.error('chatterbox: Failed to send message', data);
@@ -29,14 +37,14 @@ var app = {
     });
   },
   
-  // fetch('http://parse.sfm6.hackreactor.com/chatterbox/classes/messages');
-  fetch: function (url) {
+  fetch: function (callback) {
     $.ajax({
-      url: url,
+      url: app.server,
       type: 'GET',
       contentType: 'application/json',
-      success: function(data) {
-        console.log('chatterbox: Message fetched', data);
+      success: function(data) { 
+        data.results.forEach(app.renderMessage);     
+        console.log('chatterbox: Message fetched', data.results);
       },
       error: function (data) {
         console.error('chatterbox: Failed to fetch data', data);
@@ -50,9 +58,22 @@ var app = {
     
   },
   
+  sanitize: function(string) {
+    if (string) {
+      if (string.includes('<script>') || string.includes('<SCRIPT>')){
+        console.log('Found a string with bugs: ', string);
+        return string.slice(8);
+      }
+      return string;
+    }
+  },
+  
   renderMessage: function(message) {
-    var username = $('<span class="username">' + message.username + '</span>');
-    var text = $('<span class="text">' + message.text + '</span>');
+    var cleanText = app.sanitize(message.text);
+    var cleanUsername = app.sanitize(message.username);
+    var cleanRoom = app.sanitize(message.roomname);
+    var username = $('<span class="username">' + cleanUsername + '</span>');
+    var text = $('<span class="text">' + cleanText + '</span>');
     var messageContainer = $('<div class="message-containter"></div>');
     messageContainer.append(username);
     messageContainer.append(text);
@@ -61,13 +82,11 @@ var app = {
     username.on('click', function () {
       app.handleUsernameClick(message['username']);
     });
-    
-    
   },
   
   renderRoom: function(room) {
     var node = $('<a>' + room + '</a>');
-    $('.dropdown-content').append(node);
+    $('#roomSelect').append(node);
   },
 
   
@@ -75,17 +94,20 @@ var app = {
     app.user.friend.push(username);
   },
   
-  handleSubmit: function (message) {
-    var obj = {
-      message: message,
+  handleSubmit: function (text) {
+    var message = {
       username: app.user.username,
+      text: text,
       roomname: 'room'
     };
-    app.send(obj);
+    console.log(message);
+    app.send(message);
   }
-  
-  
 };
+
+$(document).ready(function() {
+  app.init();
+});
   
   
 
